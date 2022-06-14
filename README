@@ -1,0 +1,5 @@
+pak
+===
+
+pak/unpak is a simple .pak archive utility to list, extract and create
+pak archives
