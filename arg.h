@@ -1,50 +1,37 @@
-/*
- * Copy me if you can.
- * by 20h
- */
+/* Copy me if you can. */
 
-#ifndef ARG_H__
-#define ARG_H__
+#ifndef ARG_H
+#define ARG_H
 
 extern char *argv0;
 
-/* use main(int argc, char *argv[]) */
-#define ARGBEGIN	for (argv0 = *argv, argv++, argc--;\
-					argv[0] && argv[0][0] == '-'\
-					&& argv[0][1];\
-					argc--, argv++) {\
-				char argc_;\
-				char **argv_;\
-				int brk_;\
-				if (argv[0][1] == '-' && argv[0][2] == '\0') {\
-					argv++;\
-					argc--;\
-					break;\
-				}\
-				int i_;\
-				for (i_ = 1, brk_ = 0, argv_ = argv;\
-						argv[0][i_] && !brk_;\
-						i_++) {\
-					if (argv_ != argv)\
-						break;\
-					argc_ = argv[0][i_];\
-					switch (argc_)
+#define ARGBEGIN {char *_arg, **_argp, **_args;				\
+	for (argv0 = *argv++, argc--, _args = _argp = argv;		\
+	     _arg = *_argp;		/* while != NULL */		\
+	     *_argp ? _argp++ : 0)	/* inc only if _argp != NULL */	\
+		if (*_arg == '-' && _arg[1] == '-' && _arg[2] == '\0')	\
+			for (argc--, _argp++;	/* skip the '--' arg */	\
+			     _arg = *_argp;				\
+			     *_argp ? _argp++ : 0)			\
+				*(_args++) = _arg; /* copy all args */	\
+		else if (*_arg == '-' && _arg[1] != '-' && _arg[1] != '\0') \
+			for (argc--, _arg++; *_arg; *_arg ? _arg++ : 0)	\
+				switch (*_arg)
 
-#define ARGEND			}\
-			}
+#define ARGLONG else if (*_arg == '-' && _arg[1] == '-' && _arg[2] != '\0')
 
-#define ARGC()		argc_
+#define ARGEND	else *(_args++) = _arg; /* else copy the argument */ }
 
-#define EARGF(x)	((argv[0][i_+1] == '\0' && argv[1] == NULL)?\
-				((x), abort(), (char *)0) :\
-				(brk_ = 1, (argv[0][i_+1] != '\0')?\
-					(&argv[0][i_+1]) :\
-					(argc--, argv++, argv[0])))
+#define ARGC()		*_arg
+#define ARGF()		((_arg[1])? (*_arg = 0, _arg + 1) :\
+			(_argp[1])? (argc--, _argp++, _argp[0]) :\
+			NULL)
+#define EARGF(x)	((_arg[1])? (*_arg = 0, _arg + 1) :\
+			(_argp[1])? (argc--, _argp++, _argp[0]) :\
+			((x), abort(), NULL))
 
-#define ARGF()		((argv[0][i_+1] == '\0' && argv[1] == NULL)?\
-				(char *)0 :\
-				(brk_ = 1, (argv[0][i_+1] != '\0')?\
-					(&argv[0][i_+1]) :\
-					(argc--, argv++, argv[0])))
+#define ARGLC()		(_arg + 2)
+#define ARGLF()		(_argp ? (_argp++, *_argp) : NULL)
+#define EARGLF(x)	(_argp ? (_argp++, *_argp) : ((x), abort(), NULL))
 
-#endif
+#endif /* ARG_H*/
