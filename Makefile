@@ -31,6 +31,6 @@ dist:
 	rm -rf pak-$(VERSION)
 
 clean:
-	rm -f pak pak.o pak-$(VERSION).tar.gz
+	rm -f pak pak.o
 
 .PHONY: all install uninstall dist clean
