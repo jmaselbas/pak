@@ -20,10 +20,10 @@ install:
 	mkdir -p $(DESTDIR)$(PREFIX)/bin
 	cp -f pak $(DESTDIR)$(PREFIX)/bin
 	chmod 755 $(DESTDIR)$(PREFIX)/bin/pak
-	ln -s pak $(DESTDIR)$(PREFIX)/bin/unpak
+	ln -fs pak $(DESTDIR)$(PREFIX)/bin/unpak
 	mkdir -p $(DESTDIR)$(MANPREFIX)/man1
 	sed "s/VERSION/$(VERSION)/g" < pak.1 > $(DESTDIR)$(MANPREFIX)/man1/pak.1
-	ln -s pak.1 $(DESTDIR)$(MANPREFIX)/man1/unpak.1
+	ln -fs pak.1 $(DESTDIR)$(MANPREFIX)/man1/unpak.1
 
 uninstall:
 	rm -vf $(DESTDIR)$(PREFIX)/bin/pak
