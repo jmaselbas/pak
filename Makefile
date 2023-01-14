@@ -17,6 +17,7 @@ install:
 	mkdir -p $(DESTDIR)$(PREFIX)/bin
 	cp -f pak $(DESTDIR)$(PREFIX)/bin
 	chmod 755 $(DESTDIR)$(PREFIX)/bin/pak
+	ln -s pak $(DESTDIR)$(PREFIX)/bin/unpak
 
 uninstall:
 	rm -vf $(DESTDIR)$(PREFIX)/bin/pak
