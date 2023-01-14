@@ -199,8 +199,8 @@ char *argv0;
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: pak [-xt] FILE [FILE ...]\n");
-	fprintf(stderr, "       unpak [-xt] FILE\n");
+	fprintf(stderr, "usage: pak [-xt] [-f] ARCHIVE [FILE ...]\n");
+	fprintf(stderr, "       unpak [-xt] [-f] ARCHIVE\n");
 	exit(1);
 }
 
