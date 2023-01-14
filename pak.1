@@ -1,0 +1,25 @@
+.TH PAK 1 pak\-VERSION
+.SH NAME
+pak \- an archiving utility, as used by quake
+.SH SYNOPSIS
+.B pak
+.RB [ \-xt ]
+.IR ARCHIVE
+.RI [ FILE  ...]
+.PP
+.B unpak
+.
+is equivalent to
+.B pak \-x
+.SH DESCRIPTION
+.B pak
+is a simple utility to create and extract .pak archives, as the one used by Quake game.
+This simple archive format implies some limitations on the file names, including path,
+that cannot exceed 56 bytes.
+.SH OPTIONS
+.TP
+.B \-x
+Extract files from an archive.
+.TP
+.B \-t
+List files in an archive.

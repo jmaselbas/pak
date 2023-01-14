@@ -3,11 +3,12 @@ VERSION = 0.1.0
 
 # Install paths
 PREFIX = /usr/local
+MANPREFIX = $(PREFIX)/share/man
 
 HDR = arg.h
 SRC = pak.c
 OBJ = $(SRC:.c=.o)
-DISTFILES = $(SRC) $(HDR) Makefile
+DISTFILES = $(SRC) $(HDR) pak.1 Makefile
 
 all: pak
 
@@ -18,10 +19,15 @@ install:
 	cp -f pak $(DESTDIR)$(PREFIX)/bin
 	chmod 755 $(DESTDIR)$(PREFIX)/bin/pak
 	ln -s pak $(DESTDIR)$(PREFIX)/bin/unpak
+	mkdir -p $(DESTDIR)$(MANPREFIX)/man1
+	sed "s/VERSION/$(VERSION)/g" < pak.1 > $(DESTDIR)$(MANPREFIX)/man1/pak.1
+	ln -s pak.1 $(DESTDIR)$(MANPREFIX)/man1/unpak.1
 
 uninstall:
 	rm -vf $(DESTDIR)$(PREFIX)/bin/pak
 	rm -vf $(DESTDIR)$(PREFIX)/bin/unpak
+	rm -vf $(DESTDIR)$(MANPREFIX)/man1/pak.1
+	rm -vf $(DESTDIR)$(MANPREFIX)/man1/unpak.1
 
 dist:
 	mkdir -p pak-$(VERSION)
