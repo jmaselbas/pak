@@ -14,18 +14,8 @@
 #include <sys/stat.h>
 
 #include "arg.h"
-
-struct pak_head {
-	char magic[4];
-	uint32_t off;
-	uint32_t len;
-};
-
-struct pak_item {
-	char name[56];
-	uint32_t off;
-	uint32_t len;
-};
+#define PAK_IMPLEMENTATION
+#include "pak.h"
 
 static int list;
 static int extract;
@@ -57,7 +47,7 @@ mkdir_parent(const char *filepath)
 }
 
 static int
-write_file(const char *name, const char *buf, size_t size)
+write_file(const char *name, size_t size, const char *buf)
 {
 	int ret = 0;
 	FILE *f = fopen(name, "w");
@@ -78,37 +68,17 @@ write_file(const char *name, const char *buf, size_t size)
 }
 
 static void
-unpak(const char *buf, size_t size)
+do_unpak(struct pak *pak)
 {
-	struct pak_head hdr;
-	struct pak_item *itm;
-	size_t i;
+	struct pak_file f;
 
-	if (size < sizeof(hdr)) {
-		fprintf(stderr, "not enough data: %d\n", size);
-		exit(1);
-	}
-
-	memcpy(&hdr, buf, sizeof(hdr));
-
-	if (strncmp("PACK", hdr.magic, sizeof(hdr.magic)) != 0) {
-		fprintf(stderr, "bad magic\n");
-		exit(1);
-	}
-
-	if (size < (hdr.off + hdr.len)) {
-		fprintf(stderr, "not enough data: %d+%d vs %d\n", hdr.off, hdr.len, size);
-		exit(1);
-	}
-
-	itm = (struct pak_item *)(buf + hdr.off);
-	for (i = 0; i < (hdr.len / sizeof(*itm)); i++) {
+	pak_for_each_file(pak, &f) {
 		if (list)
-			printf("%s\n", itm[i].name);
+			printf("%s\n", f.name);
 
 		if (extract) {
-			mkdir_parent(itm[i].name);
-			write_file(itm[i].name, buf + itm[i].off, itm[i].len);
+			mkdir_parent(f.name);
+			write_file(f.name, f.size, f.data);
 		}
 	}
 }
@@ -116,6 +86,7 @@ unpak(const char *buf, size_t size)
 static void
 unpak_file(const char *name)
 {
+	struct pak pak;
 	struct stat sb;
 	void *buf;
 	int fd;
@@ -135,7 +106,10 @@ unpak_file(const char *name)
 		perror("mmap");
 		exit(1);
 	}
-	unpak(buf, sb.st_size);
+	if (pak_from_memory(sb.st_size, buf, &pak) < 0)
+		exit(1);
+
+	do_unpak(&pak);
 	munmap(buf, sb.st_size);
 }
 
@@ -204,7 +178,7 @@ pak_files(const char *name, int count, char **file)
 	}
 
 	off = ftell(f);
-	if (off >= (1ULL << 32)) {
+	if ((unsigned long long)off >= (1ULL << 32)) {
 		fprintf(stderr, "cannot create %s: too much data\n", name);
 		exit(1);
 	}

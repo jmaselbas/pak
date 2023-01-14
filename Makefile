@@ -5,12 +5,14 @@ VERSION = 0.1.0
 PREFIX = /usr/local
 MANPREFIX = $(PREFIX)/share/man
 
-HDR = arg.h
+HDR = arg.h pak.h
 SRC = pak.c
 OBJ = $(SRC:.c=.o)
 DISTFILES = $(SRC) $(HDR) pak.1 Makefile
 
 all: pak
+
+$(OBJ): $(HDR)
 
 pak: $(OBJ)
 
@@ -37,6 +39,6 @@ dist:
 	rm -rf pak-$(VERSION)
 
 clean:
-	rm -f pak pak.o
+	rm -f $(OBJ) pak
 
 .PHONY: all install uninstall dist clean
