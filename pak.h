@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: ISC */
+#ifndef PAK_H
+#define PAK_H
 #include <stddef.h>
 
 struct pak {
@@ -38,15 +40,17 @@ struct pak_file *pak_file_at(const struct pak *pak, int index, struct pak_file *
 struct pak_file *pak_find_file(const struct pak *pak, const char *name, struct pak_file *file);
 
 #define pak_for_each_file(p, f) for ((f)->index = 0; pak_file_at(p, (f)->index, f); (f)->index++)
+#endif /* PAK_H */
 
 #ifdef PAK_IMPLEMENTATION
-
 #include <stdint.h>
 #include <string.h>
 
 static int pak_err(const char *msg)
 {
+#ifndef PAK_NO_STDIO
 	fprintf(stderr, "%s\n", msg);
+#endif
 	return -1;
 }
 
