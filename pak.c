@@ -53,7 +53,7 @@ static int
 write_file(const char *name, size_t size, const char *buf)
 {
 	int ret = 0;
-	FILE *f = fopen(name, "w");
+	FILE *f = fopen(name, "wb");
 
 	if (!f) {
 		perror(name);
@@ -156,7 +156,7 @@ pak_files(const char *name, int count, char **file)
 	FILE *f;
 
 	mkdir_parent(name);
-	f = fopen(name, "w");
+	f = fopen(name, "wb");
 	if (!f) {
 		perror("fopen");
 		exit(1);
