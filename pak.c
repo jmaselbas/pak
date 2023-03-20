@@ -17,6 +17,9 @@
 #define PAK_IMPLEMENTATION
 #include "pak.h"
 
+#define __noreturn __attribute__((noreturn))
+__noreturn static void usage(void);
+
 static int list;
 static int extract;
 
@@ -223,7 +226,7 @@ main(int argc, char **argv)
 		list = 1;
 		break;
 	case 'f':
-		file = EARGF(usage);
+		file = EARGF(usage());
 		break;
 	default:
 		usage();
