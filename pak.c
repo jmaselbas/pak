@@ -102,7 +102,7 @@ unpak_file(const char *name)
 	}
 	buf = mmap(NULL, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	close(fd);
-	if (buf == NULL) {
+	if (buf == MAP_FAILED) {
 		perror("mmap");
 		exit(1);
 	}
@@ -132,7 +132,7 @@ fwrite_file(const char *name, FILE *f)
 	}
 	buf = mmap(NULL, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	close(fd);
-	if (buf == NULL) {
+	if (buf == MAP_FAILED) {
 		perror("mmap");
 		exit(1);
 	}
