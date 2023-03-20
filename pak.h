@@ -6,6 +6,11 @@
 struct pak {
 	unsigned int size;
 	void *data;
+	unsigned int flag;
+};
+enum {
+	PAK_FROM_FILE = 1,
+	PAK_FROM_MMAP = 2,
 };
 
 struct pak_file {
@@ -114,7 +119,9 @@ int pak_from_memory(unsigned int size, void *data, struct pak *pak)
 
 int pak_from_file(FILE *f, struct pak *pak)
 {
-	struct pak p = {};
+	struct pak p = {
+		.flag = PAK_FROM_FILE,
+	};
 	int size;
 	size_t n;
 

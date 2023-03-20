@@ -70,54 +70,8 @@ write_file(const char *name, size_t size, const char *buf)
 	return ret;
 }
 
-static void
-do_unpak(struct pak *pak)
-{
-	struct pak_file f;
-
-	pak_for_each_file(pak, &f) {
-		if (list)
-			printf("%s\n", f.name);
-
-		if (extract) {
-			mkdir_parent(f.name);
-			write_file(f.name, f.size, f.data);
-		}
-	}
-}
-
-static void
-unpak_file(const char *name)
-{
-	struct pak pak;
-	struct stat sb;
-	void *buf;
-	int fd;
-
-	fd = open(name, O_RDONLY);
-	if (fd == -1) {
-		perror(name);
-		exit(1);
-	}
-	if (fstat(fd, &sb) < 0) {
-		perror("fstat");
-		exit(1);
-	}
-	buf = mmap(NULL, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-	close(fd);
-	if (buf == MAP_FAILED) {
-		perror("mmap");
-		exit(1);
-	}
-	if (pak_from_memory(sb.st_size, buf, &pak) < 0)
-		exit(1);
-
-	do_unpak(&pak);
-	munmap(buf, sb.st_size);
-}
-
 static size_t
-fwrite_file(const char *name, FILE *f)
+fwrite_file(FILE *f, const char *name)
 {
 	struct stat sb;
 	void *buf;
@@ -143,6 +97,59 @@ fwrite_file(const char *name, FILE *f)
 	munmap(buf, sb.st_size);
 
 	return n;
+}
+
+static void
+do_unpak(struct pak *pak)
+{
+	struct pak_file f;
+
+	pak_for_each_file(pak, &f) {
+		if (list)
+			printf("%s\n", f.name);
+
+		if (extract) {
+			mkdir_parent(f.name);
+			write_file(f.name, f.size, f.data);
+		}
+	}
+}
+
+static int pak_read_mmap(const char *name, struct pak *pak)
+{
+	struct pak p = {
+		.flag = PAK_FROM_MMAP,
+	};
+	struct stat sb;
+	int fd;
+
+	fd = open(name, O_RDONLY);
+	if (fd == -1)
+		return pak_err("open");
+	if (fstat(fd, &sb) < 0)
+		return pak_err("fstat");
+	p.size = sb.st_size;
+	p.data = mmap(NULL, p.size, PROT_READ, MAP_PRIVATE, fd, 0);
+	close(fd);
+
+	if (p.data == MAP_FAILED)
+		return pak_err("mmap");
+
+	if (pak_check_header(p)) {
+		munmap(p.data, p.size);
+		return -1;
+	}
+
+	*pak = p;
+	return 0;
+}
+
+static void pak_free(struct pak *pak)
+{
+	if (pak->flag == PAK_FROM_FILE)
+		free(pak->data), pak->data = NULL;
+	if (pak->flag == PAK_FROM_MMAP)
+		munmap(pak->data, pak->size), pak->data = NULL;
 }
 
 static void
@@ -177,7 +184,7 @@ pak_files(const char *name, int count, char **file)
 			exit(1);
 		}
 		itm[i].off = ftell(f);
-		itm[i].len = fwrite_file(itm[i].name, f);
+		itm[i].len = fwrite_file(f, itm[i].name);
 	}
 
 	off = ftell(f);
@@ -210,6 +217,7 @@ usage(void)
 int
 main(int argc, char **argv)
 {
+	struct pak pak;
 	char *name;
 	char *file = NULL;
 
@@ -241,10 +249,14 @@ main(int argc, char **argv)
 		argv++;
 	}
 
-	if (extract || list)
-		unpak_file(file);
-	else if (argc > 0)
+	if (extract || list) {
+		if (pak_read_mmap(file, &pak))
+			return -1;
+		do_unpak(&pak);
+		pak_free(&pak);
+	} else if (argc > 0) {
 		pak_files(file, argc, argv);
+	}
 
 	return 0;
 }
