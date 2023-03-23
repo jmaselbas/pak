@@ -7,6 +7,11 @@ struct pak {
 	unsigned int size;
 	void *data;
 	unsigned int flag;
+	size_t count;
+	struct pak_item *items;
+#ifndef PAK_NO_STDIO
+	FILE *file;
+#endif
 };
 enum {
 	PAK_FROM_FILE = 1,

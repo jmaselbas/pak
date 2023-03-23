@@ -70,35 +70,6 @@ write_file(const char *name, size_t size, const char *buf)
 	return ret;
 }
 
-static size_t
-fwrite_file(FILE *f, const char *name)
-{
-	struct stat sb;
-	void *buf;
-	int fd;
-	size_t n;
-
-	fd = open(name, O_RDONLY);
-	if (fd == -1) {
-		perror(name);
-		exit(1);
-	}
-	if (fstat(fd, &sb) < 0) {
-		perror("fstat");
-		exit(1);
-	}
-	buf = mmap(NULL, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-	close(fd);
-	if (buf == MAP_FAILED) {
-		perror("mmap");
-		exit(1);
-	}
-	n = fwrite(buf, 1, sb.st_size, f);
-	munmap(buf, sb.st_size);
-
-	return n;
-}
-
 static void
 do_unpak(struct pak *pak)
 {
@@ -150,17 +121,142 @@ static void pak_free(struct pak *pak)
 		free(pak->data), pak->data = NULL;
 	if (pak->flag == PAK_FROM_MMAP)
 		munmap(pak->data, pak->size), pak->data = NULL;
+	// TODO: handle "writer" mode
+}
+
+static void
+pak_create(struct pak *pak, FILE *f)
+{
+	struct pak_head hdr = { 0 };
+	struct pak p = {
+		.file = f,
+		.size = sizeof(hdr),
+	};
+
+	/* when file is given the archive will be written on the fly, file
+	 * content will not be kep in memory, the archive is "write-only" */
+	// TODO: test if f is seekable ie ESPIPE
+	if (p.file) {
+		/* write a blank header, this will be overwritten later */
+		fseek(f, 0, SEEK_SET);
+		fwrite(&hdr, sizeof(hdr), 1, f);
+		p.size += sizeof(hdr);
+	}
+	*pak = p;
+}
+
+static int pak_push_pak_file(struct pak *pak, const struct pak_file *pf)
+{
+	struct pak_item itm = {
+		.off = pak->size,
+		.len = pf->size,
+	};
+	void *p;
+	int n;
+
+	memcpy(itm.name, pf->name, strnlen(pf->name, sizeof(itm.name) - 1));
+	if (pak->file) { // TODO: use a proper flag
+		n = fwrite(pf->data, pf->size, 1, pak->file);
+		if (n != 1)
+			return pak_err("fwrite");
+	} else {
+		p = realloc(pak->data, pak->size + pf->size);
+		if (!p)
+			return pak_err("realloc");
+		pak->data = p;
+		memcpy(pak->data + pak->size, pf->data, pf->size);
+	}
+	pak->size += pf->size;
+
+	/* now push the file item */
+	p = realloc(pak->items, (pak->count + 1) * sizeof(struct pak_item));
+	if (!p)
+		return pak_err("realloc");
+	pak->items = p;
+	pak->items[pak->count++] = itm;
+	return 0;
+}
+
+static int pak_push_file(struct pak *pak, const char *name, size_t size, const void *data)
+{
+	struct pak_file pf = {
+		.name = name,
+		.size = size,
+		.data = data,
+	};
+	return pak_push_pak_file(pak, &pf);
+}
+
+static int pak_push_from_file(struct pak *pak, const char *name, FILE *f)
+{
+	char *p, *buf = NULL;
+	size_t n, len = 0;
+	int ret;
+	do {
+		p = realloc(buf, len + 4096);
+		if (!p) {
+			free(buf);
+			return pak_err("realloc");
+		}
+		buf = p;
+		n = fread(buf + len, sizeof(char), 4096, f);
+		len += n;
+		if (n < 4096)
+			break;
+	} while (!feof(f));
+	ret = pak_push_file(pak, name, len, buf);
+	free(buf);
+	return ret;
+}
+
+static int pak_push_from_path(struct pak *pak, const char *path)
+{
+	FILE *f = fopen(path, "rb");
+	int ret;
+	if (!f)
+		return pak_err("fopen");
+	// TODO: test for S_ISDIR(stat.st_mode)
+	ret = pak_push_from_file(pak, path, f);
+	fclose(f);
+	return ret;
+}
+
+static int pak_write_file(struct pak *pak, FILE *f)
+{
+	struct pak_head hdr = {
+		.magic = "PACK",
+		.off = pak->size, /* end of file */
+		.len = pak->count * sizeof(struct pak_item),
+	};
+
+	if (pak->file && f != pak->file)
+		return pak_err("file mismatch");
+	if (f == NULL)
+		f = pak->file;
+	if (f == NULL)
+		return pak_err("no file");
+
+	if (!pak->file) { // TODO: use a proper flag
+		memcpy(pak->data, &hdr, sizeof(hdr));
+		fwrite(pak->data, pak->size, 1, f);
+		fwrite(pak->items, pak->count, sizeof(struct pak_item), f);
+	} else {
+		fwrite(pak->items, pak->count, sizeof(struct pak_item), f);
+		/* now update the header */
+		fseek(f, 0, SEEK_SET);
+		fwrite(&hdr, sizeof(hdr), 1, f);
+	}
+
+	return 0;
 }
 
 static void
 pak_files(const char *name, int count, char **file)
 {
-	struct pak_head hdr = { 0 };
-	struct pak_item *itm = NULL;
-	size_t n;
-	long off;
-	int i;
+
+	struct pak pak;
 	FILE *f;
+	int i, r;
 
 	mkdir_parent(name);
 	f = fopen(name, "wb");
@@ -168,40 +264,13 @@ pak_files(const char *name, int count, char **file)
 		perror("fopen");
 		exit(1);
 	}
-	/* write a blank header, this will be overwritten later */
-	fwrite(&hdr, sizeof(hdr), 1, f);
-
-	itm = calloc(count, sizeof(*itm));
-	if (!itm) {
-		perror("malloc");
-		exit(1);
-	}
-
+	pak_create(&pak, NULL);
 	for (i = 0; i < count; i++) {
-		n = snprintf(itm[i].name, sizeof(itm[i].name), "%s", file[i]);
-		if (n == sizeof(itm[i].name)) {
-			fprintf(stderr, "%s: filename too long\n", file[i]);
-			exit(1);
-		}
-		itm[i].off = ftell(f);
-		itm[i].len = fwrite_file(f, itm[i].name);
+		if (pak_push_from_path(&pak, file[i]))
+			break;
 	}
-
-	off = ftell(f);
-	if ((unsigned long long)off >= (1ULL << 32)) {
-		fprintf(stderr, "cannot create %s: too much data\n", name);
-		exit(1);
-	}
-
-	fwrite(itm, sizeof(*itm), count, f);
-	free(itm);
-
-	/* now update the header */
-	memcpy(hdr.magic, "PACK", 4);
-	hdr.off = off;
-	hdr.len = count * sizeof(*itm);
-	fseek(f, 0, SEEK_SET);
-	fwrite(&hdr, sizeof(hdr), 1, f);
+	pak_write_file(&pak, f);
+	pak_free(&pak);
 }
 
 char *argv0;
